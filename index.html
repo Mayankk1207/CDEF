@@ -463,10 +463,8 @@ import java.util.Scanner;
 import org.cloudbus.cloudsim.*;
 import org.cloudbus.cloudsim.core.CloudSim;
 import org.cloudbus.cloudsim.provisioners.*;
-import org.cloudbus.cloudsim.VmAllocationPolicySimple;
-import org.cloudbus.cloudsim.VmSchedulerTimeShared;
 
-public class CloudSimExampleUserInput {
+public class CloudSimExample12 {
 
     public static DatacenterBroker broker;
     private static List<Cloudlet> cloudletList;
@@ -476,50 +474,47 @@ public class CloudSimExampleUserInput {
 
         Scanner sc = new Scanner(System.in);
 
+        // USER INPUT
+        System.out.println("=== Enter VM Configuration ===");
+
+        System.out.print("Enter VM ID: ");
+        int vmid = sc.nextInt();
+
+        System.out.print("Enter VM MIPS: ");
+        int mips = sc.nextInt();
+
+        System.out.print("Enter VM RAM (MB): ");
+        int ram = sc.nextInt();
+
+        System.out.print("Enter VM Storage (Image Size MB): ");
+        long size = sc.nextLong();
+
+        System.out.print("Enter VM Bandwidth: ");
+        long bw = sc.nextLong();
+
+        System.out.print("Enter number of VM CPU cores: ");
+        int pesNumber = sc.nextInt();
+
+        System.out.print("Enter Cloudlet Length: ");
+        long cloudletLength = sc.nextLong();
+
+        System.out.println("\nStarting CloudSimExample12...\n");
+
         try {
-            System.out.println("Starting CloudSim Simulation with User Input VM Config...");
+            int num_user = 1;
+            Calendar calendar = Calendar.getInstance();
+            boolean trace_flag = false;
 
-            // CloudSim Init
-            CloudSim.init(1, Calendar.getInstance(), false);
+            CloudSim.init(num_user, calendar, trace_flag);
 
-            // Create one datacenter
             Datacenter datacenter0 = createDatacenter("Datacenter_0");
 
-            // Create broker
             broker = new DatacenterBroker("Broker");
             int brokerId = broker.getId();
 
-            // ============================
-            // USER INPUT FOR VM RESOURCES
-            // ============================
-            System.out.println("Enter VM Configuration:");
-
-            System.out.print("VM ID: ");
-            int vmid = sc.nextInt();
-
-            System.out.print("VM MIPS: ");
-            int mips = sc.nextInt();
-
-            System.out.print("VM RAM (MB): ");
-            int ram = sc.nextInt();
-
-            System.out.print("VM Bandwidth (BW): ");
-            long bw = sc.nextLong();
-
-            System.out.print("VM Storage (Size MB): ");
-            long size = sc.nextLong();
-
-            System.out.print("Number of CPU Cores (PEs): ");
-            int pesNumber = sc.nextInt();
-
-            System.out.print("VMM Name (like Xen/VMware): ");
-            String vmm = sc.next();
-
-            // ============================
-            // CREATE VM
-            // ============================
             vmlist = new ArrayList<>();
 
+            // Create VM
             Vm vm = new Vm(
                     vmid,
                     brokerId,
@@ -528,53 +523,47 @@ public class CloudSimExampleUserInput {
                     ram,
                     bw,
                     size,
-                    vmm,
+                    "Xen",
                     new CloudletSchedulerTimeShared()
             );
 
             vmlist.add(vm);
-            broker.submitVmList(vmlist);
 
-            // ============================
-            // CREATE ONE CLOUDLET
-            // ============================
+            // Correct CloudSim 3.x method
+            broker.submitGuestList(vmlist);
+
+            // CLOUDLET
             cloudletList = new ArrayList<>();
-
-            int id = 0;
-            long length = 400000;
-            long fileSize = 300;
-            long outputSize = 300;
-
             UtilizationModel utilizationModel = new UtilizationModelFull();
 
             Cloudlet cloudlet = new Cloudlet(
-                    id,
-                    length,
+                    0,
+                    cloudletLength,
                     pesNumber,
-                    fileSize,
-                    outputSize,
+                    300,
+                    300,
                     utilizationModel,
                     utilizationModel,
                     utilizationModel
             );
 
             cloudlet.setUserId(brokerId);
-            cloudlet.setVmId(vmid);
+            cloudlet.setVmId(vmid);  // Correct method for CloudSim 3.x
+
             cloudletList.add(cloudlet);
 
             broker.submitCloudletList(cloudletList);
 
-            // START simulation
             CloudSim.startSimulation();
             CloudSim.stopSimulation();
 
-            printCloudletList(broker.getCloudletReceivedList());
+            List<Cloudlet> newList = broker.getCloudletReceivedList();
+            printCloudletList(newList);
 
-            System.out.println("Simulation finished!");
+            System.out.println("\nCloudSimExample12 Finished!");
 
         } catch (Exception e) {
             e.printStackTrace();
-            System.out.println("Error occurred!");
         }
 
         sc.close();
@@ -586,33 +575,36 @@ public class CloudSimExampleUserInput {
         List<Pe> peList = new ArrayList<>();
 
         int mips = 1000;
-
         peList.add(new Pe(0, new PeProvisionerSimple(mips)));
 
         int hostId = 0;
-        int ram = 4096;
+        int ram = 2048;
         long storage = 1000000;
         int bw = 10000;
 
-        hostList.add(new Host(
+        Host host = new Host(
                 hostId,
                 new RamProvisionerSimple(ram),
                 new BwProvisionerSimple(bw),
                 storage,
                 peList,
                 new VmSchedulerTimeShared(peList)
-        ));
+        );
 
-        DatacenterCharacteristics characteristics = new DatacenterCharacteristics(
-                "x86",
-                "Linux",
-                "Xen",
-                hostList,
-                10.0,
-                3.0,
-                0.05,
-                0.001,
-                0.0);
+        hostList.add(host);
+
+        DatacenterCharacteristics characteristics =
+                new DatacenterCharacteristics(
+                        "x86",
+                        "Linux",
+                        "Xen",
+                        hostList,
+                        10.0,
+                        3.0,
+                        0.05,
+                        0.001,
+                        0.0
+                );
 
         Datacenter datacenter = null;
 
@@ -632,30 +624,28 @@ public class CloudSimExampleUserInput {
     }
 
     private static void printCloudletList(List<Cloudlet> list) {
-        DecimalFormat dft = new DecimalFormat("###.##");
 
         System.out.println("\n========== OUTPUT ==========");
-        System.out.println("Cloudlet ID\tSTATUS\tDatacenter ID\tVM ID\tTime\tStart\tFinish");
+        System.out.println("Cloudlet ID    STATUS    Datacenter ID    VM ID    Time    Start    Finish");
+
+        DecimalFormat dft = new DecimalFormat("###.##");
 
         for (Cloudlet cloudlet : list) {
+
             if (cloudlet.getStatus() == Cloudlet.CloudletStatus.SUCCESS) {
                 System.out.println(
-                        cloudlet.getCloudletId() +
-                                "\t\tSUCCESS\t" +
-                                cloudlet.getResourceId() +
-                                "\t\t" +
-                                cloudlet.getVmId() +
-                                "\t" +
-                                dft.format(cloudlet.getActualCPUTime()) +
-                                "\t" +
-                                dft.format(cloudlet.getExecStartTime()) +
-                                "\t" +
+                        cloudlet.getCloudletId() + "            SUCCESS         " +
+                                cloudlet.getResourceId() + "              " +
+                                cloudlet.getVmId() + "      " +
+                                dft.format(cloudlet.getActualCPUTime()) + "      " +
+                                dft.format(cloudlet.getExecStartTime()) + "      " +
                                 dft.format(cloudlet.getExecFinishTime())
                 );
             }
         }
     }
 }
+
 
 </textarea>
 
