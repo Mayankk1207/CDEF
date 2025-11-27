@@ -23,85 +23,262 @@
 <body>
 <h2 style="margin-top:28px;color:#cfe0ff">Writing code for creating a data centre with one host</h2>
 <textarea id="cloudsimOneHost" style="min-height:260px">package org.cloudbus.cloudsim.examples;
+package org.cloudbus.cloudsim.examples;
 
-import java.util.*;
-import org.cloudbus.cloudsim.*;
+/*
+ * Title:        CloudSim Toolkit
+ * Description:  CloudSim (Cloud Simulation) Toolkit for Modeling and Simulation
+ *               of Clouds
+ * Licence:      GPL - http://www.gnu.org/copyleft/gpl.html
+ *
+ * Copyright (c) 2009, The University of Melbourne, Australia
+ */
+
+import java.text.DecimalFormat;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.LinkedList;
+import java.util.List;
+
+import org.cloudbus.cloudsim.Cloudlet;
+import org.cloudbus.cloudsim.CloudletSchedulerTimeShared;
+import org.cloudbus.cloudsim.Datacenter;
+import org.cloudbus.cloudsim.DatacenterBroker;
+import org.cloudbus.cloudsim.DatacenterCharacteristics;
+import org.cloudbus.cloudsim.Host;
+import org.cloudbus.cloudsim.Log;
+import org.cloudbus.cloudsim.Pe;
+import org.cloudbus.cloudsim.Storage;
+import org.cloudbus.cloudsim.UtilizationModel;
+import org.cloudbus.cloudsim.UtilizationModelFull;
+import org.cloudbus.cloudsim.Vm;
+import org.cloudbus.cloudsim.VmAllocationPolicySimple;
+import org.cloudbus.cloudsim.VmSchedulerTimeShared;
 import org.cloudbus.cloudsim.core.CloudSim;
-import org.cloudbus.cloudsim.provisioners.*;
+import org.cloudbus.cloudsim.provisioners.BwProvisionerSimple;
+import org.cloudbus.cloudsim.provisioners.PeProvisionerSimple;
+import org.cloudbus.cloudsim.provisioners.RamProvisionerSimple;
 
 /**
- * Writing code for creating a data centre with one host (VM values entered by user)
+ * A simple example showing how to create a data center with one host and run one cloudlet on it.
  */
 public class CloudSimExample1 {
+	public static DatacenterBroker broker;
 
-    public static DatacenterBroker broker;
-    private static List<Cloudlet> cloudletList;
-    private static List<Vm> vmlist;
+	/** The cloudlet list. */
+	private static List<Cloudlet> cloudletList;
+	/** The vmlist. */
+	private static List<Vm> vmlist;
 
-    public static void main(String[] args) {
-        Log.println("Starting CloudSimExample1 with user‑input VM values...");
+	/**
+	 * Creates main() to run this example.
+	 *
+	 * @param args the args
+	 */
+	public static void main(String[] args) {
+		Log.println("Starting CloudSimExample1...");
 
-        Scanner sc = new Scanner(System.in);
+		try {
+			// First step: Initialize the CloudSim package. It should be called before creating any entities.
+			int num_user = 1; // number of cloud users
+			Calendar calendar = Calendar.getInstance(); // Calendar whose fields have been initialized with the current date and time.
+ 			boolean trace_flag = false; // trace events
 
-        System.out.print("Enter VM MIPS: ");
-        int mips = sc.nextInt();
-        System.out.print("Enter VM RAM (MB): ");
-        int ram = sc.nextInt();
-        System.out.print("Enter VM Size (MB): ");
-        long size = sc.nextLong();
-        System.out.print("Enter Bandwidth: ");
-        long bw = sc.nextLong();
-        System.out.print("Enter number of PEs: ");
-        int pesNumber = sc.nextInt();
+			/* Comment Start - Dinesh Bhagwat 
+			 * Initialize the CloudSim library. 
+			 * init() invokes initCommonVariable() which in turn calls initialize() (all these 3 methods are defined in CloudSim.java).
+			 * initialize() creates two collections - an ArrayList of SimEntity Objects (named entities which denote the simulation entities) and 
+			 * a LinkedHashMap (named entitiesByName which denote the LinkedHashMap of the same simulation entities), with name of every SimEntity as the key.
+			 * initialize() creates two queues - a Queue of SimEvents (future) and another Queue of SimEvents (deferred). 
+			 * initialize() creates a HashMap of of Predicates (with integers as keys) - these predicates are used to select a particular event from the deferred queue. 
+			 * initialize() sets the simulation clock to 0 and running (a boolean flag) to false.
+			 * Once initialize() returns (note that we are in method initCommonVariable() now), a CloudSimShutDown (which is derived from SimEntity) instance is created 
+			 * (with numuser as 1, its name as CloudSimShutDown, id as -1, and state as RUNNABLE). Then this new entity is added to the simulation 
+			 * While being added to the simulation, its id changes to 0 (from the earlier -1). The two collections - entities and entitiesByName are updated with this SimEntity.
+			 * the shutdownId (whose default value was -1) is 0    
+			 * Once initCommonVariable() returns (note that we are in method init() now), a CloudInformationService (which is also derived from SimEntity) instance is created 
+			 * (with its name as CloudInformatinService, id as -1, and state as RUNNABLE). Then this new entity is also added to the simulation. 
+			 * While being added to the simulation, the id of the SimEntitiy is changed to 1 (which is the next id) from its earlier value of -1. 
+			 * The two collections - entities and entitiesByName are updated with this SimEntity.
+			 * the cisId(whose default value is -1) is 1
+			 * Comment End - Dinesh Bhagwat 
+			 */
+			CloudSim.init(num_user, calendar, trace_flag);
 
-        try {
-            int numUser = 1;
-            Calendar calendar = Calendar.getInstance();
-            boolean traceFlag = false;
-            CloudSim.init(numUser, calendar, traceFlag);
+			// Second step: Create Datacenters
+			// Datacenters are the resource providers in CloudSim. We need at
+			// list one of them to run a CloudSim simulation
+			Datacenter datacenter0 = createDatacenter("Datacenter_0");
 
-            Datacenter datacenter0 = createDatacenter("Datacenter_0");
+			// Third step: Create Broker
+			broker = new DatacenterBroker("Broker");;
+			int brokerId = broker.getId();
 
-            broker = new DatacenterBroker("Broker");
-            int brokerId = broker.getId();
+			// Fourth step: Create one virtual machine
+			vmlist = new ArrayList<>();
 
-            vmlist = new ArrayList<>();
+			// VM description
+			int vmid = 0;
+			int mips = 1000;
+			long size = 10000; // image size (MB)
+			int ram = 512; // vm memory (MB)
+			long bw = 1000;
+			int pesNumber = 1; // number of cpus
+			String vmm = "Xen"; // VMM name
 
-            int vmid = 0;
-            String vmm = "Xen";
+			// create VM
+			Vm vm = new Vm(vmid, brokerId, mips, pesNumber, ram, bw, size, vmm, new CloudletSchedulerTimeShared());
 
-            Vm vm = new Vm(vmid, brokerId, mips, pesNumber, ram, bw, size, vmm,
-                    new CloudletSchedulerTimeShared());
-            vmlist.add(vm);
-            broker.submitVmList(vmlist);
+			// add the VM to the vmList
+			vmlist.add(vm);
 
-            cloudletList = new ArrayList<>();
-            int id = 0;
-            long length = 400000;
-            long fileSize = 300;
-            long outputSize = 300;
-            UtilizationModel utilizationModel = new UtilizationModelFull();
+			// submit vm list to the broker
+			broker.submitGuestList(vmlist);
 
-            Cloudlet cloudlet = new Cloudlet(id, length, pesNumber, fileSize, outputSize,
-                    utilizationModel, utilizationModel, utilizationModel);
-            cloudlet.setUserId(brokerId);
-            cloudlet.setVmId(vmid);
+			// Fifth step: Create one Cloudlet
+			cloudletList = new ArrayList<>();
 
-            cloudletList.add(cloudlet);
-            broker.submitCloudletList(cloudletList);
+			// Cloudlet properties
+			int id = 0;
+			long length = 400000;
+			long fileSize = 300;
+			long outputSize = 300;
+			UtilizationModel utilizationModel = new UtilizationModelFull();
 
-            CloudSim.startSimulation();
-            CloudSim.stopSimulation();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+			Cloudlet cloudlet = new Cloudlet(id, length, pesNumber, fileSize,
+                                        outputSize, utilizationModel, utilizationModel, 
+                                        utilizationModel);
+			cloudlet.setUserId(brokerId);
+			cloudlet.setGuestId(vmid);
 
-        sc.close();
-    }
+			// add the cloudlet to the list
+			cloudletList.add(cloudlet);
 
-    private static Datacenter createDatacenter(String name) {
-        return null;
-    }
+			// submit cloudlet list to the broker
+			broker.submitCloudletList(cloudletList);
+
+			// Sixth step: Starts the simulation
+			CloudSim.startSimulation();
+
+			CloudSim.stopSimulation();
+
+			//Final step: Print results when simulation is over
+			List<Cloudlet> newList = broker.getCloudletReceivedList();
+			printCloudletList(newList);
+
+			Log.println("CloudSimExample1 finished!");
+		} catch (Exception e) {
+			e.printStackTrace();
+			Log.println("Unwanted errors happen");
+		}
+	}
+
+	/**
+	 * Creates the datacenter.
+	 *
+	 * @param name the name
+	 *
+	 * @return the datacenter
+	 */
+	private static Datacenter createDatacenter(String name) {
+
+		// Here are the steps needed to create a PowerDatacenter:
+		// 1. We need to create a list to store
+		// our machine
+		List<Host> hostList = new ArrayList<>();
+
+		// 2. A Machine contains one or more PEs or CPUs/Cores.
+		// In this example, it will have only one core.
+		List<Pe> peList = new ArrayList<>();
+
+		int mips = 1000;
+
+		// 3. Create PEs and add these into a list.
+		peList.add(new Pe(0, new PeProvisionerSimple(mips))); // need to store Pe id and MIPS Rating
+
+		// 4. Create Host with its id and list of PEs and add them to the list
+		// of machines
+		int hostId = 0;
+		int ram = 2048; // host memory (MB)
+		long storage = 1000000; // host storage
+		int bw = 10000;
+
+		hostList.add(
+			new Host(
+				hostId,
+				new RamProvisionerSimple(ram),
+				new BwProvisionerSimple(bw),
+				storage,
+				peList,
+				new VmSchedulerTimeShared(peList)
+			)
+		); // This is our machine
+
+		// 5. Create a DatacenterCharacteristics object that stores the
+		// properties of a data center: architecture, OS, list of
+		// Machines, allocation policy: time- or space-shared, time zone
+		// and its price (G$/Pe time unit).
+		String arch = "x86"; // system architecture
+		String os = "Linux"; // operating system
+		String vmm = "Xen";
+		double time_zone = 10.0; // time zone this resource located
+		double cost = 3.0; // the cost of using processing in this resource
+		double costPerMem = 0.05; // the cost of using memory in this resource
+		double costPerStorage = 0.001; // the cost of using storage in this
+										// resource
+		double costPerBw = 0.0; // the cost of using bw in this resource
+		LinkedList<Storage> storageList = new LinkedList<>(); // we are not adding SAN
+													// devices by now
+
+		DatacenterCharacteristics characteristics = new DatacenterCharacteristics(
+				arch, os, vmm, hostList, time_zone, cost, costPerMem,
+				costPerStorage, costPerBw);
+
+		// 6. Finally, we need to create a PowerDatacenter object.
+		Datacenter datacenter = null;
+		try {
+			datacenter = new Datacenter(name, characteristics, new VmAllocationPolicySimple(hostList), storageList, 0);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+		return datacenter;
+	}
+
+	/**
+	 * Prints the Cloudlet objects.
+	 *
+	 * @param list list of Cloudlets
+	 */
+	private static void printCloudletList(List<Cloudlet> list) {
+		int size = list.size();
+		Cloudlet cloudlet;
+
+		String indent = "    ";
+		Log.println();
+		Log.println("========== OUTPUT ==========");
+		Log.println("Cloudlet ID" + indent + "STATUS" + indent
+				+ "Data center ID" + indent + "VM ID" + indent + "Time" + indent
+				+ "Start Time" + indent + "Finish Time");
+
+		DecimalFormat dft = new DecimalFormat("###.##");
+		for (Cloudlet value : list) {
+			cloudlet = value;
+			Log.print(indent + cloudlet.getCloudletId() + indent + indent);
+
+			if (cloudlet.getStatus() == Cloudlet.CloudletStatus.SUCCESS) {
+				Log.print("SUCCESS");
+
+				Log.println(indent + indent + cloudlet.getResourceId()
+						+ indent + indent + indent + cloudlet.getGuestId()
+						+ indent + indent
+						+ dft.format(cloudlet.getActualCPUTime()) + indent
+						+ indent + dft.format(cloudlet.getExecStartTime())
+						+ indent + indent
+						+ dft.format(cloudlet.getExecFinishTime()));
+			}
+		}
+	}
 }</textarea>
 
   
@@ -277,16 +454,19 @@ window.onload=attachCopyButtons;
 <h2 style="margin-top:28px;color:#cfe0ff">Writing code for creating a data centre with one host with soft changes</h2>
 <textarea id="cloudsimSoft" style="min-height:260px">package org.cloudbus.cloudsim.examples;
 
+package org.cloudbus.cloudsim.examples;
+
+import java.text.DecimalFormat;
 import java.util.*;
+import java.util.Scanner;
+
 import org.cloudbus.cloudsim.*;
 import org.cloudbus.cloudsim.core.CloudSim;
 import org.cloudbus.cloudsim.provisioners.*;
+import org.cloudbus.cloudsim.VmAllocationPolicySimple;
+import org.cloudbus.cloudsim.VmSchedulerTimeShared;
 
-/**
- * A simple example showing how to create a data center with one host and run one cloudlet on it,
- * with VM configuration taken from user input.
- */
-public class CloudSimExample1 {
+public class CloudSimExampleUserInput {
 
     public static DatacenterBroker broker;
     private static List<Cloudlet> cloudletList;
@@ -295,50 +475,71 @@ public class CloudSimExample1 {
     public static void main(String[] args) {
 
         Scanner sc = new Scanner(System.in);
-        System.out.println("------ Enter VM Configuration ------");
-
-        System.out.print("Enter VM MIPS: ");
-        int mips = sc.nextInt();
-
-        System.out.print("Enter VM RAM (MB): ");
-        int ram = sc.nextInt();
-
-        System.out.print("Enter VM Size (MB): ");
-        long size = sc.nextLong();
-
-        System.out.print("Enter VM Bandwidth: ");
-        long bw = sc.nextLong();
-
-        System.out.print("Enter number of PEs: ");
-        int pesNumber = sc.nextInt();
-
-        System.out.println("------------------------------------");
-
-        Log.println("Starting CloudSimExample1...");
 
         try {
-            int numUser = 1;
-            Calendar calendar = Calendar.getInstance();
-            boolean traceFlag = false;
-            CloudSim.init(numUser, calendar, traceFlag);
+            System.out.println("Starting CloudSim Simulation with User Input VM Config...");
 
+            // CloudSim Init
+            CloudSim.init(1, Calendar.getInstance(), false);
+
+            // Create one datacenter
             Datacenter datacenter0 = createDatacenter("Datacenter_0");
 
+            // Create broker
             broker = new DatacenterBroker("Broker");
             int brokerId = broker.getId();
 
+            // ============================
+            // USER INPUT FOR VM RESOURCES
+            // ============================
+            System.out.println("Enter VM Configuration:");
+
+            System.out.print("VM ID: ");
+            int vmid = sc.nextInt();
+
+            System.out.print("VM MIPS: ");
+            int mips = sc.nextInt();
+
+            System.out.print("VM RAM (MB): ");
+            int ram = sc.nextInt();
+
+            System.out.print("VM Bandwidth (BW): ");
+            long bw = sc.nextLong();
+
+            System.out.print("VM Storage (Size MB): ");
+            long size = sc.nextLong();
+
+            System.out.print("Number of CPU Cores (PEs): ");
+            int pesNumber = sc.nextInt();
+
+            System.out.print("VMM Name (like Xen/VMware): ");
+            String vmm = sc.next();
+
+            // ============================
+            // CREATE VM
+            // ============================
             vmlist = new ArrayList<>();
 
-            int vmid = 0;
-            String vmm = "Xen";
-
-            Vm vm = new Vm(vmid, brokerId, mips, pesNumber, ram, bw, size, vmm,
-                    new CloudletSchedulerTimeShared());
+            Vm vm = new Vm(
+                    vmid,
+                    brokerId,
+                    mips,
+                    pesNumber,
+                    ram,
+                    bw,
+                    size,
+                    vmm,
+                    new CloudletSchedulerTimeShared()
+            );
 
             vmlist.add(vm);
             broker.submitVmList(vmlist);
 
+            // ============================
+            // CREATE ONE CLOUDLET
+            // ============================
             cloudletList = new ArrayList<>();
+
             int id = 0;
             long length = 400000;
             long fileSize = 300;
@@ -346,29 +547,116 @@ public class CloudSimExample1 {
 
             UtilizationModel utilizationModel = new UtilizationModelFull();
 
-            Cloudlet cloudlet = new Cloudlet(id, length, pesNumber, fileSize, outputSize,
-                    utilizationModel, utilizationModel, utilizationModel);
+            Cloudlet cloudlet = new Cloudlet(
+                    id,
+                    length,
+                    pesNumber,
+                    fileSize,
+                    outputSize,
+                    utilizationModel,
+                    utilizationModel,
+                    utilizationModel
+            );
 
             cloudlet.setUserId(brokerId);
             cloudlet.setVmId(vmid);
-
             cloudletList.add(cloudlet);
+
             broker.submitCloudletList(cloudletList);
 
+            // START simulation
             CloudSim.startSimulation();
             CloudSim.stopSimulation();
 
+            printCloudletList(broker.getCloudletReceivedList());
+
+            System.out.println("Simulation finished!");
+
         } catch (Exception e) {
             e.printStackTrace();
+            System.out.println("Error occurred!");
         }
 
         sc.close();
     }
 
     private static Datacenter createDatacenter(String name) {
-        return null; // You can fill host creation here if needed
+
+        List<Host> hostList = new ArrayList<>();
+        List<Pe> peList = new ArrayList<>();
+
+        int mips = 1000;
+
+        peList.add(new Pe(0, new PeProvisionerSimple(mips)));
+
+        int hostId = 0;
+        int ram = 4096;
+        long storage = 1000000;
+        int bw = 10000;
+
+        hostList.add(new Host(
+                hostId,
+                new RamProvisionerSimple(ram),
+                new BwProvisionerSimple(bw),
+                storage,
+                peList,
+                new VmSchedulerTimeShared(peList)
+        ));
+
+        DatacenterCharacteristics characteristics = new DatacenterCharacteristics(
+                "x86",
+                "Linux",
+                "Xen",
+                hostList,
+                10.0,
+                3.0,
+                0.05,
+                0.001,
+                0.0);
+
+        Datacenter datacenter = null;
+
+        try {
+            datacenter = new Datacenter(
+                    name,
+                    characteristics,
+                    new VmAllocationPolicySimple(hostList),
+                    new LinkedList<Storage>(),
+                    0
+            );
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return datacenter;
+    }
+
+    private static void printCloudletList(List<Cloudlet> list) {
+        DecimalFormat dft = new DecimalFormat("###.##");
+
+        System.out.println("\n========== OUTPUT ==========");
+        System.out.println("Cloudlet ID\tSTATUS\tDatacenter ID\tVM ID\tTime\tStart\tFinish");
+
+        for (Cloudlet cloudlet : list) {
+            if (cloudlet.getStatus() == Cloudlet.CloudletStatus.SUCCESS) {
+                System.out.println(
+                        cloudlet.getCloudletId() +
+                                "\t\tSUCCESS\t" +
+                                cloudlet.getResourceId() +
+                                "\t\t" +
+                                cloudlet.getVmId() +
+                                "\t" +
+                                dft.format(cloudlet.getActualCPUTime()) +
+                                "\t" +
+                                dft.format(cloudlet.getExecStartTime()) +
+                                "\t" +
+                                dft.format(cloudlet.getExecFinishTime())
+                );
+            }
+        }
     }
 }
+
 </textarea>
 
 </body>
