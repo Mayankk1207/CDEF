@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>CloudSim Java Saver — 1 Host / 1 Datacenter / 1 VM / 1 Cloudlet</title>
+  <style>
+    :root{font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial;}
+    body{margin:0;background:#0f172a;color:#e6eef8;padding:28px}
+    .card{background:#0b1220;border-radius:12px;padding:18px;box-shadow:0 6px 30px rgba(2,6,23,.6);max-width:1100px;margin:0 auto}
+    h1{margin:0 0 8px;font-size:20px}
+    p{margin:0 0 16px;color:#9fb0d6}
+    label{display:block;font-size:13px;color:#cfe0ff;margin-bottom:6px}
+    input,select,textarea{width:100%;padding:8px;border-radius:8px;background:#071126;border:1px solid #14304f;color:#d7e9ff}
+    button{background:#0ea5a4;border:none;padding:10px 12px;border-radius:8px;color:#012;cursor:pointer;font-weight:600}
+    pre{background:#071126;padding:12px;border-radius:8px;overflow:auto;border:1px solid #14304f}
+    .controls{display:flex;gap:8px;margin-top:12px}
+    .footer{margin-top:12px;color:#9fb0d6;font-size:13px}
+    textarea{min-height:380px;font-family:monospace;font-size:13px}
+    @media(max-width:800px){.controls{flex-direction:column}}
+  </style>
+</head>
+<body>
+<h2 style="margin-top:28px;color:#cfe0ff">Writing code for creating a data centre with one host</h2>
+<textarea id="cloudsimOneHost" style="min-height:260px">package org.cloudbus.cloudsim.examples;
+
+import java.util.*;
+import org.cloudbus.cloudsim.*;
+import org.cloudbus.cloudsim.core.CloudSim;
+import org.cloudbus.cloudsim.provisioners.*;
+
+/**
+ * Writing code for creating a data centre with one host (VM values entered by user)
+ */
+public class CloudSimExample1 {
+
+    public static DatacenterBroker broker;
+    private static List<Cloudlet> cloudletList;
+    private static List<Vm> vmlist;
+
+    public static void main(String[] args) {
+        Log.println("Starting CloudSimExample1 with user‑input VM values...");
+
+        Scanner sc = new Scanner(System.in);
+
+        System.out.print("Enter VM MIPS: ");
+        int mips = sc.nextInt();
+        System.out.print("Enter VM RAM (MB): ");
+        int ram = sc.nextInt();
+        System.out.print("Enter VM Size (MB): ");
+        long size = sc.nextLong();
+        System.out.print("Enter Bandwidth: ");
+        long bw = sc.nextLong();
+        System.out.print("Enter number of PEs: ");
+        int pesNumber = sc.nextInt();
+
+        try {
+            int numUser = 1;
+            Calendar calendar = Calendar.getInstance();
+            boolean traceFlag = false;
+            CloudSim.init(numUser, calendar, traceFlag);
+
+            Datacenter datacenter0 = createDatacenter("Datacenter_0");
+
+            broker = new DatacenterBroker("Broker");
+            int brokerId = broker.getId();
+
+            vmlist = new ArrayList<>();
+
+            int vmid = 0;
+            String vmm = "Xen";
+
+            Vm vm = new Vm(vmid, brokerId, mips, pesNumber, ram, bw, size, vmm,
+                    new CloudletSchedulerTimeShared());
+            vmlist.add(vm);
+            broker.submitVmList(vmlist);
+
+            cloudletList = new ArrayList<>();
+            int id = 0;
+            long length = 400000;
+            long fileSize = 300;
+            long outputSize = 300;
+            UtilizationModel utilizationModel = new UtilizationModelFull();
+
+            Cloudlet cloudlet = new Cloudlet(id, length, pesNumber, fileSize, outputSize,
+                    utilizationModel, utilizationModel, utilizationModel);
+            cloudlet.setUserId(brokerId);
+            cloudlet.setVmId(vmid);
+
+            cloudletList.add(cloudlet);
+            broker.submitCloudletList(cloudletList);
+
+            CloudSim.startSimulation();
+            CloudSim.stopSimulation();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        sc.close();
+    }
+
+    private static Datacenter createDatacenter(String name) {
+        return null;
+    }
+}</textarea>
+
+  
+
+    <div class="footer">Tip: After downloading, add CloudSim library jars to your classpath to compile and run this example.</div>
+  </div>
+
+<script>
+const key = 'cloudsim_java_example_v1';
+const javaCodeEl = document.getElementById('javaCode');
+const filenameEl = document.getElementById('filename');
+
+document.getElementById('saveLocal').addEventListener('click', ()=>{
+  const data = { filename: filenameEl.value || 'CloudSimExample1.java', code: javaCodeEl.value };
+  localStorage.setItem(key, JSON.stringify(data));
+  alert('Saved to browser storage.');
+});
+
+document.getElementById('loadLocal').addEventListener('click', ()=>{
+  const s = localStorage.getItem(key);
+  if(!s){ alert('No saved file in browser.'); return; }
+  try{
+    const data = JSON.parse(s);
+    filenameEl.value = data.filename || filenameEl.value;
+    javaCodeEl.value = data.code || javaCodeEl.value;
+    alert('Loaded from browser storage.');
+  }catch(e){ alert('Failed to parse saved data.'); }
+});
+
+document.getElementById('clearLocal').addEventListener('click', ()=>{
+  localStorage.removeItem(key);
+  alert('Cleared saved file.');
+});
+
+function downloadFile(filename, content){
+  const blob = new Blob([content], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+document.getElementById('download').addEventListener('click', ()=>{
+  const fname = filenameEl.value.trim() || 'CloudSimExample1.java';
+  downloadFile(fname, javaCodeEl.value);
+});
+
+// Auto-load if saved exists
+window.addEventListener('load', ()=>{
+  const s = localStorage.getItem(key);
+  if(s){
+    try{ const data = JSON.parse(s); javaCodeEl.value = data.code || javaCodeEl.value; filenameEl.value = data.filename || filenameEl.value; }catch(e){}
+  }
+});
+</script>
+
+<script>
+function attachCopyButtons(){
+  document.querySelectorAll('textarea').forEach(area=>{
+    if(area.nextElementSibling && area.nextElementSibling.classList.contains('copy-btn')) return;
+    const btn=document.createElement('button');
+    btn.textContent='Copy Code';
+    btn.className='copy-btn';
+    btn.style.margin='6px 0 20px 0';
+    btn.style.padding='8px 12px';
+    btn.style.borderRadius='8px';
+    btn.style.background='#0ea5a4';
+    btn.style.color='#012';
+    btn.style.border='none';
+    btn.style.cursor='pointer';
+    btn.onclick=()=>{navigator.clipboard.writeText(area.value); alert('Code copied!');};
+    area.insertAdjacentElement('afterend',btn);
+  });
+}
+window.onload=attachCopyButtons;
+</script>
+
+
+<h2 style="margin-top:28px;color:#cfe0ff">SOAP XML Code to Add Book Details</h2>
+<textarea id="soapXml" style="min-height:260px"><?xml version="1.0"?>
+<soap:Envelope xmlns:soap="https://www.w3.org/2003/05/soap-envel">
+  <soap:Header>
+    SOAP-XML PROGRAM
+  </soap:Header>
+  <soap:Body>
+    <books>
+      <title>Introduction to Cloud Computing</title>
+      <author>Rahul Johari</author>
+      <bookdetails>
+        <PubHouse>Pearson</PubHouse>
+        <Price>Rs 325</Price>
+        <Numberofpages>300</Numberofpages>
+      </bookdetails>
+
+      <title>Cloud Computing for Beginners</title>
+      <author>Atul Tripathi</author>
+      <bookdetails>
+        <PubHouse>Pearson</PubHouse>
+        <Price>Rs 325</Price>
+        <Numberofpages>300</Numberofpages>
+      </bookdetails>
+    </books>
+  </soap:Body>
+</soap:Envelope></textarea>
+
+
+
+<h2 style="margin-top:28px;color:#cfe0ff">SOAP XML Program to Retrieve Company Profile</h2>
+<textarea id="soapCompany" style="min-height:260px"><?xml version="1.0"?>
+<soap:Envelope
+    xmlns:soap="http://www.ibm.com/2025/01/soap-envelope"
+    soap:encodingStyle="http://www.ibm.com/2025/01/soap-encodi">
+    <soap:Body xmlns:m="http://https://www.ibm.com/in-en/company">
+        <m:GetCompanyProfile>
+            <m:CompanyName>IBM India Private Limited</m:CompanyName>
+            <m:City>NOIDA</m:City>
+            <m:Country>India</m:Country>
+            <m:CEO>IBM</m:CEO>
+        </m:GetCompanyProfile>
+    </soap:Body>
+</soap:Envelope></textarea>
+
+
+
+<h2 style="margin-top:28px;color:#cfe0ff">Designing and Validating an XML Document to Represent Data Using an Online XML Editor</h2>
+<textarea id="employeeXml" style="min-height:260px"><?xml version="1.0" encoding="UTF-8"?>
+<employees>
+    <employee>
+        <id>1</id>
+        <firstName>Prarit</firstName>
+        <lastName>Arora</lastName>
+        <DOB>
+            <date>10</date>
+            <month>August</month>
+            <year>2005</year>
+        </DOB>
+        <Designation>Manager</Designation>
+    </employee>
+
+    <employee>
+        <id>2</id>
+        <firstName>Rahul</firstName>
+        <lastName>Singh</lastName>
+    </employee>
+</employees></textarea>
+
+
+
+<h2 style="margin-top:28px;color:#cfe0ff">Write XML with DTD Defining Element Structure and Validation Rules</h2>
+<textarea id="xmlDtd" style="min-height:260px"><?xml version ="1.0" encoding="UTF-8"?>
+<!DOCTYPE company
+[
+<!ELEMENT company (os,memory,webserevr,dbserver)>
+<!ELEMENT os (#PCDATA)>
+<!ELEMENT memory (#PCDATA)>
+<!ELEMENT webserver (#PCDATA)>
+<!ELEMENT dbserver (#PCDATA)>
+]>
+<company>
+    <name> Oracle oci</name>
+    <os>windows</os>
+    <memory>64 gb</memory>
+    <webserver>apache tomcat</webserver>
+    <dbserver>oracle</dbserver>
+</company></textarea>
+
+
+
+<h2 style="margin-top:28px;color:#cfe0ff">Writing code for creating a data centre with one host with soft changes</h2>
+<textarea id="cloudsimSoft" style="min-height:260px">package org.cloudbus.cloudsim.examples;
+
+import java.util.*;
+import org.cloudbus.cloudsim.*;
+import org.cloudbus.cloudsim.core.CloudSim;
+import org.cloudbus.cloudsim.provisioners.*;
+
+/**
+ * A simple example showing how to create a data center with one host and run one cloudlet on it,
+ * with VM configuration taken from user input.
+ */
+public class CloudSimExample1 {
+
+    public static DatacenterBroker broker;
+    private static List<Cloudlet> cloudletList;
+    private static List<Vm> vmlist;
+
+    public static void main(String[] args) {
+
+        Scanner sc = new Scanner(System.in);
+        System.out.println("------ Enter VM Configuration ------");
+
+        System.out.print("Enter VM MIPS: ");
+        int mips = sc.nextInt();
+
+        System.out.print("Enter VM RAM (MB): ");
+        int ram = sc.nextInt();
+
+        System.out.print("Enter VM Size (MB): ");
+        long size = sc.nextLong();
+
+        System.out.print("Enter VM Bandwidth: ");
+        long bw = sc.nextLong();
+
+        System.out.print("Enter number of PEs: ");
+        int pesNumber = sc.nextInt();
+
+        System.out.println("------------------------------------");
+
+        Log.println("Starting CloudSimExample1...");
+
+        try {
+            int numUser = 1;
+            Calendar calendar = Calendar.getInstance();
+            boolean traceFlag = false;
+            CloudSim.init(numUser, calendar, traceFlag);
+
+            Datacenter datacenter0 = createDatacenter("Datacenter_0");
+
+            broker = new DatacenterBroker("Broker");
+            int brokerId = broker.getId();
+
+            vmlist = new ArrayList<>();
+
+            int vmid = 0;
+            String vmm = "Xen";
+
+            Vm vm = new Vm(vmid, brokerId, mips, pesNumber, ram, bw, size, vmm,
+                    new CloudletSchedulerTimeShared());
+
+            vmlist.add(vm);
+            broker.submitVmList(vmlist);
+
+            cloudletList = new ArrayList<>();
+            int id = 0;
+            long length = 400000;
+            long fileSize = 300;
+            long outputSize = 300;
+
+            UtilizationModel utilizationModel = new UtilizationModelFull();
+
+            Cloudlet cloudlet = new Cloudlet(id, length, pesNumber, fileSize, outputSize,
+                    utilizationModel, utilizationModel, utilizationModel);
+
+            cloudlet.setUserId(brokerId);
+            cloudlet.setVmId(vmid);
+
+            cloudletList.add(cloudlet);
+            broker.submitCloudletList(cloudletList);
+
+            CloudSim.startSimulation();
+            CloudSim.stopSimulation();
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        sc.close();
+    }
+
+    private static Datacenter createDatacenter(String name) {
+        return null; // You can fill host creation here if needed
+    }
+}
+</textarea>
+
+</body>
+</html>
